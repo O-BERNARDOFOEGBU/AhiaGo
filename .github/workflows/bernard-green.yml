@@ -2,42 +2,39 @@ name: Smart Daily Commits
 
 on:
   schedule:
-    # Run once daily at midnight UTC (01:00 Lagos)
+    # Runs every 6 hours — 12 AM, 6 AM, 12 PM, 6 PM UTC
     - cron: '0 0 * * *'
+    - cron: '0 6 * * *'
+    - cron: '0 12 * * *'
+    - cron: '0 18 * * *'
   workflow_dispatch:
 
 jobs:
-  automate_commits:
+  commit_job:
     runs-on: ubuntu-latest
-    timeout-minutes: 350  # allows long sleep periods
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Set up Git identity
+      - name: Configure Git
         run: |
           git config user.name "O-BERNARDOFOEGBU"
           git config user.email "obinnaofoegbu71@gmail.com"
 
-      - name: Generate commits across the day
+      - name: Generate smart commits
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           touch daily-log.md
-          DAY=$(date -u +"%d")
-          DATE=$(date -u +"%Y-%m-%d")
+          DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-          # Decide commit count
-          if [ $((10#$DAY % 2)) -eq 0 ]; then
-            COMMITS=2
-          else
-            COMMITS=$(( (RANDOM % 3) + 3 ))  # 3 to 5 commits
-          fi
+          # Choose 2–4 commits per run
+          COMMITS=$(( (RANDOM % 3) + 2 ))
 
-          echo "Today is $DATE → Planning $COMMITS commits."
+          echo "Planned $COMMITS commits for this run."
 
           MESSAGES=(
             "Keep building — progress compounds."
@@ -52,22 +49,12 @@ jobs:
             "Writing code, writing history."
           )
 
-          # Simulated commit times (minutes between commits)
-          INTERVALS=(60 120 180 240 300)  # 1h–5h spacing
-
           for ((i=1; i<=COMMITS; i++)); do
-            TIME=$(date -u +"%H:%M:%S UTC")
             MSG=${MESSAGES[$RANDOM % ${#MESSAGES[@]}]}
+            TIME=$(date -u +"%H:%M:%S UTC")
             echo "- **$DATE $TIME** — $MSG (commit $i/$COMMITS)" >> daily-log.md
             git add daily-log.md
-            git commit -m "Auto-log: $DATE $TIME (commit $i/$COMMITS) — $MSG"
-
-            # Random sleep between commits to spread them through the day
-            if [ $i -lt $COMMITS ]; then
-              SLEEP=${INTERVALS[$RANDOM % ${#INTERVALS[@]}]}
-              echo "Sleeping for $SLEEP minutes before next commit..."
-              sleep $((SLEEP * 60))
-            fi
+            git commit -m "Auto-log: $DATE $TIME — $MSG (commit $i/$COMMITS)" || true
           done
 
           git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}
